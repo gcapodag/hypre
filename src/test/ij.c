@@ -226,7 +226,8 @@ main( hypre_int argc,
    HYPRE_Int      P_max_elmts = 4;
    HYPRE_Int      cycle_type;
    HYPRE_Int      fcycle;
-   HYPRE_Int      coarsen_type = 10;
+   // changed coarsen_type (was 10) to run as in the GPU case
+   HYPRE_Int      coarsen_type = 8;
    HYPRE_Int      measure_type = 0;
    HYPRE_Int      num_sweeps = 1;
    HYPRE_Int      IS_type;
@@ -257,8 +258,10 @@ main( hypre_int argc,
    HYPRE_Int    add_P_max_elmts = 0;
    HYPRE_Real   add_trunc_factor = 0;
    HYPRE_Int    rap2     = 0;
-   HYPRE_Int    mod_rap2 = 0;
-   HYPRE_Int    keepTranspose = 0;
+   //changed mode_rap2 (was 0) to run as for the GPU case
+   HYPRE_Int    mod_rap2 = 1;
+   //changed keepTranspose (was 0) to run as for the GPU case
+   HYPRE_Int    keepTranspose = 1;
 #ifdef HYPRE_USING_DSUPERLU
    HYPRE_Int    dslu_threshold = -1;
 #endif
@@ -1835,7 +1838,9 @@ main( hypre_int argc,
 #if defined(HYPRE_USING_GPU)
       relax_type = 7;
 #else
-      relax_type = 0;
+      //changed to run as in the GPU case
+      //relax_type = 0
+      relax_type = 7;
 #endif
       ns_down = 0;
       ns_up = 3;
@@ -2327,6 +2332,9 @@ main( hypre_int argc,
       hypre_printf("  Dirichlet 0 BCs are implicit in the spatial operator\n");
    }
 
+   int numberOfCycles = 10;
+   // BEGIN of iC loop for Spatial Operator
+   for (int iC = 0; iC < numberOfCycles; iC++){
    time_index = hypre_InitializeTiming("Spatial Operator");
    hypre_BeginTiming(time_index);
    if ( build_matrix_type == -1 )
@@ -2421,8 +2429,12 @@ main( hypre_int argc,
    }
    hypre_EndTiming(time_index);
    hypre_PrintTiming("Generate Matrix", hypre_MPI_COMM_WORLD);
+   if (myid ==0) {
+      hypre_printf("Iteration ---- %d\n", iC);
+   }
    hypre_FinalizeTiming(time_index);
    hypre_ClearTiming();
+   //} //END of iC loop for Spatial operator
 
    /* Check the ij interface - not necessary if one just wants to test solvers */
    if (test_ij && build_matrix_type > -1)
@@ -2811,6 +2823,8 @@ main( hypre_int argc,
    /*-----------------------------------------------------------
     * Set up the RHS and initial guess
     *-----------------------------------------------------------*/
+   // BEGIN of iC loop for RHS and Initial Guess
+   //for (int iC = 0; iC < numberOfCycles; iC++){
    time_index = hypre_InitializeTiming("RHS and Initial Guess");
    hypre_BeginTiming(time_index);
 
@@ -3322,8 +3336,12 @@ main( hypre_int argc,
 
    hypre_EndTiming(time_index);
    hypre_PrintTiming("IJ Vector Setup", hypre_MPI_COMM_WORLD);
+   if (myid ==0) {
+      hypre_printf("Iteration ---- %d\n", iC);
+   }
    hypre_FinalizeTiming(time_index);
    hypre_ClearTiming();
+   //} // END of iC loop for RHS and Initial Guess
 
    if (num_functions > 1)
    {
@@ -3565,6 +3583,12 @@ main( hypre_int argc,
 
    if (solver_id == 0 || solver_id == 90)
    {
+
+      // BEGIN of iC loop for BoomerAMG Setup
+      //for (int iC = 0; iC < numberOfCycles; iC++){
+      //  if (myid == 0) { 
+      //     hypre_printf("Iteration ---- %d\n", iC); 
+      //  }
       if (solver_id == 0)
       {
          if (myid == 0) { hypre_printf("Solver:  AMG\n"); }
@@ -3932,7 +3956,9 @@ main( hypre_int argc,
       {
          HYPRE_BoomerAMGDDDestroy(amgdd_solver);
       }
-   }
+    } 
+
+    } //END of iC loop 
 
    /*-----------------------------------------------------------
     * Solve the system using GSMG
@@ -4522,26 +4548,28 @@ main( hypre_int argc,
          HYPRE_BoomerAMGSetCoarsenType(amg_solver, 8);
          HYPRE_BoomerAMGSetRelaxType(amg_solver, 3);
 #else
-         HYPRE_BoomerAMGSetInterpType(amg_solver, 0);
-         HYPRE_BoomerAMGSetPostInterpType(amg_solver, post_interp_type);
-         HYPRE_BoomerAMGSetCoarsenType(amg_solver, 6);
-         HYPRE_BoomerAMGSetCycleType(amg_solver, cycle_type);
-         HYPRE_BoomerAMGSetFCycle(amg_solver, fcycle);
+         //HYPRE_BoomerAMGSetInterpType(amg_solver, 0);
+         HYPRE_BoomerAMGSetInterpType(amg_solver, 18);
+         //HYPRE_BoomerAMGSetPostInterpType(amg_solver, post_interp_type);
+         //HYPRE_BoomerAMGSetCoarsenType(amg_solver, 6);
+         HYPRE_BoomerAMGSetCoarsenType(amg_solver, 8);
+         //HYPRE_BoomerAMGSetCycleType(amg_solver, cycle_type);
+         //HYPRE_BoomerAMGSetFCycle(amg_solver, fcycle);
          HYPRE_BoomerAMGSetRelaxType(amg_solver, 3);
-         if (relax_down > -1)
-         {
-            HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_down, 1);
-         }
-         if (relax_up > -1)
-         {
-            HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_up, 2);
-         }
-         if (relax_coarse > -1)
-         {
-            HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_coarse, 3);
-         }
-         HYPRE_BoomerAMGSetSmoothType(amg_solver, smooth_type);
-         HYPRE_BoomerAMGSetSmoothNumSweeps(amg_solver, smooth_num_sweeps);
+         //if (relax_down > -1)
+         //{
+         //   HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_down, 1);
+         //}
+         //if (relax_up > -1)
+         //{
+         //   HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_up, 2);
+         //}
+         //if (relax_coarse > -1)
+         //{
+         //   HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_coarse, 3);
+         //}
+         //HYPRE_BoomerAMGSetSmoothType(amg_solver, smooth_type);
+         //HYPRE_BoomerAMGSetSmoothNumSweeps(amg_solver, smooth_num_sweeps);
 #endif
          HYPRE_BoomerAMGSetCGCIts(amg_solver, cgcits);
          HYPRE_BoomerAMGSetTol(amg_solver, 0.0);
@@ -6643,26 +6671,28 @@ main( hypre_int argc,
          HYPRE_BoomerAMGSetCoarsenType(amg_solver, 8);
          HYPRE_BoomerAMGSetRelaxType(amg_solver, 3);
 #else
-         HYPRE_BoomerAMGSetInterpType(amg_solver, 0);
-         HYPRE_BoomerAMGSetPostInterpType(amg_solver, post_interp_type);
-         HYPRE_BoomerAMGSetCoarsenType(amg_solver, 6);
-         HYPRE_BoomerAMGSetCycleType(amg_solver, cycle_type);
-         HYPRE_BoomerAMGSetFCycle(amg_solver, fcycle);
+         //HYPRE_BoomerAMGSetInterpType(amg_solver, 0);
+         HYPRE_BoomerAMGSetInterpType(amg_solver, 18);
+         //HYPRE_BoomerAMGSetPostInterpType(amg_solver, post_interp_type);
+         //HYPRE_BoomerAMGSetCoarsenType(amg_solver, 6);
+         HYPRE_BoomerAMGSetCoarsenType(amg_solver, 8);
+         //HYPRE_BoomerAMGSetCycleType(amg_solver, cycle_type);
+         //HYPRE_BoomerAMGSetFCycle(amg_solver, fcycle);
          HYPRE_BoomerAMGSetRelaxType(amg_solver, 3);
-         if (relax_down > -1)
-         {
-            HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_down, 1);
-         }
-         if (relax_up > -1)
-         {
-            HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_up, 2);
-         }
-         if (relax_coarse > -1)
-         {
-            HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_coarse, 3);
-         }
-         HYPRE_BoomerAMGSetSmoothType(amg_solver, smooth_type);
-         HYPRE_BoomerAMGSetSmoothNumSweeps(amg_solver, smooth_num_sweeps);
+         //if (relax_down > -1)
+         //{
+         //   HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_down, 1);
+         //}
+         //if (relax_up > -1)
+         //{
+         //   HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_up, 2);
+         //}
+         //if (relax_coarse > -1)
+         //{
+         //   HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_coarse, 3);
+         //}
+         //HYPRE_BoomerAMGSetSmoothType(amg_solver, smooth_type);
+         //HYPRE_BoomerAMGSetSmoothNumSweeps(amg_solver, smooth_num_sweeps);
 #endif
          HYPRE_BoomerAMGSetCGCIts(amg_solver, cgcits);
          HYPRE_BoomerAMGSetTol(amg_solver, 0.0);
@@ -7112,12 +7142,15 @@ main( hypre_int argc,
          HYPRE_BoomerAMGSetCoarsenType(amg_solver, 8);
          HYPRE_BoomerAMGSetRelaxType(amg_solver, 3);
 #else
-         HYPRE_BoomerAMGSetInterpType(amg_solver, 0);
-         HYPRE_BoomerAMGSetCoarsenType(amg_solver, 6);
-         HYPRE_BoomerAMGSetCycleType(amg_solver, 1);
-         HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, 14, 1);
-         HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, 14, 2);
-         HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, 9, 3);
+         //HYPRE_BoomerAMGSetInterpType(amg_solver, 0);
+         HYPRE_BoomerAMGSetInterpType(amg_solver, 18);
+         //HYPRE_BoomerAMGSetCoarsenType(amg_solver, 6);
+         HYPRE_BoomerAMGSetCoarsenType(amg_solver, 8);
+         //HYPRE_BoomerAMGSetCycleType(amg_solver, 1);
+         //HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, 14, 1);
+         //HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, 14, 2);
+         //HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, 9, 3);
+         HYPRE_BoomerAMGSetRelaxType(amg_solver, 3);
 #endif
          HYPRE_BoomerAMGSetTol(amg_solver, pc_tol);
          HYPRE_BoomerAMGSetPMaxElmts(amg_solver, 0);
@@ -7832,26 +7865,28 @@ main( hypre_int argc,
       HYPRE_BoomerAMGSetCoarsenType(amg_solver, 8);
       HYPRE_BoomerAMGSetRelaxType(amg_solver, 3);
 #else
-      HYPRE_BoomerAMGSetInterpType(amg_solver, 0);
-      HYPRE_BoomerAMGSetPostInterpType(amg_solver, post_interp_type);
-      HYPRE_BoomerAMGSetCoarsenType(amg_solver, 6);
-      HYPRE_BoomerAMGSetCycleType(amg_solver, cycle_type);
-      HYPRE_BoomerAMGSetFCycle(amg_solver, fcycle);
+      //HYPRE_BoomerAMGSetInterpType(amg_solver, 0);
+      HYPRE_BoomerAMGSetInterpType(amg_solver, 18);
+      //HYPRE_BoomerAMGSetPostInterpType(amg_solver, post_interp_type);
+      //HYPRE_BoomerAMGSetCoarsenType(amg_solver, 6);
+      HYPRE_BoomerAMGSetCoarsenType(amg_solver, 8);
+      //HYPRE_BoomerAMGSetCycleType(amg_solver, cycle_type);
+      //HYPRE_BoomerAMGSetFCycle(amg_solver, fcycle);
       HYPRE_BoomerAMGSetRelaxType(amg_solver, 3);
-      if (relax_down > -1)
-      {
-         HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_down, 1);
-      }
-      if (relax_up > -1)
-      {
-         HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_up, 2);
-      }
-      if (relax_coarse > -1)
-      {
-         HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_coarse, 3);
-      }
-      HYPRE_BoomerAMGSetSmoothType(amg_solver, smooth_type);
-      HYPRE_BoomerAMGSetSmoothNumSweeps(amg_solver, smooth_num_sweeps);
+      //if (relax_down > -1)
+      //{
+      //   HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_down, 1);
+      //}
+      //if (relax_up > -1)
+      //{
+      //   HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_up, 2);
+      //}
+      //if (relax_coarse > -1)
+      //{
+      //   HYPRE_BoomerAMGSetCycleRelaxType(amg_solver, relax_coarse, 3);
+      //}
+      //HYPRE_BoomerAMGSetSmoothType(amg_solver, smooth_type);
+      //HYPRE_BoomerAMGSetSmoothNumSweeps(amg_solver, smooth_num_sweeps);
 #endif
       HYPRE_BoomerAMGSetCGCIts(amg_solver, cgcits);
       HYPRE_BoomerAMGSetTol(amg_solver, tol);
