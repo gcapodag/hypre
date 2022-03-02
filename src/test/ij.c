@@ -2333,7 +2333,7 @@ main( hypre_int argc,
    }
 
    int numberOfCycles = 10;
-   // BEGIN of iC loop for Spatial Operator
+   //BEGIN of iC loop for Spatial Operator
    for (int iC = 0; iC < numberOfCycles; iC++){
    time_index = hypre_InitializeTiming("Spatial Operator");
    hypre_BeginTiming(time_index);
@@ -3631,10 +3631,12 @@ main( hypre_int argc,
       HYPRE_BoomerAMGSetADropType(amg_solver, A_drop_type);
       /* BM Aug 25, 2006 */
       HYPRE_BoomerAMGSetCGCIts(amg_solver, cgcits);
+      printf("interp type=  %d\n", interp_type);
       HYPRE_BoomerAMGSetInterpType(amg_solver, interp_type);
       HYPRE_BoomerAMGSetRestriction(amg_solver, restri_type); /* 0: P^T, 1: AIR, 2: AIR-2 */
       HYPRE_BoomerAMGSetPostInterpType(amg_solver, post_interp_type);
       HYPRE_BoomerAMGSetNumSamples(amg_solver, gsmg_samples);
+      printf("coarsen type=  %d\n", coarsen_type);
       HYPRE_BoomerAMGSetCoarsenType(amg_solver, coarsen_type);
       HYPRE_BoomerAMGSetCoarsenCutFactor(amg_solver, coarsen_cut_factor);
       HYPRE_BoomerAMGSetCPoints(amg_solver, max_levels, num_cpt, cpt_index);
@@ -3684,6 +3686,7 @@ main( hypre_int argc,
       HYPRE_BoomerAMGSetChebyEigEst(amg_solver, cheby_eig_est);
       HYPRE_BoomerAMGSetChebyVariant(amg_solver, cheby_variant);
       HYPRE_BoomerAMGSetChebyScale(amg_solver, cheby_scale);
+      printf("relax order=  %d\n", relax_order);
       HYPRE_BoomerAMGSetRelaxOrder(amg_solver, relax_order);
       HYPRE_BoomerAMGSetRelaxWt(amg_solver, relax_wt);
       HYPRE_BoomerAMGSetOuterWt(amg_solver, outer_wt);
@@ -3958,7 +3961,7 @@ main( hypre_int argc,
       }
     } 
 
-    } //END of iC loop 
+    //} //END of iC loop 
 
    /*-----------------------------------------------------------
     * Solve the system using GSMG
@@ -8116,6 +8119,8 @@ final:
    {
       hypre_TFree(isolated_fpt_index, HYPRE_MEMORY_HOST);
    }
+
+   } //END of iC loop
 
    /*
       hypre_FinalizeMemoryDebug();
