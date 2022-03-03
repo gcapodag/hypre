@@ -15,6 +15,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <cuda_runtime.h>
 
 #include "_hypre_utilities.h"
 #include "HYPRE.h"
@@ -2266,7 +2267,28 @@ main( hypre_int argc,
     * GPU Device binding
     * Must be done before HYPRE_Init() and should not be changed after
     *-----------------------------------------------------------------*/
-   hypre_bind_device(myid, num_procs, hypre_MPI_COMM_WORLD);
+   //hypre_bind_device(myid, num_procs, hypre_MPI_COMM_WORLD);
+  
+   int num_devices = 0;
+   cudaError_t cudaStatus = cudaGetDeviceCount(&num_devices);
+   printf("Number of GPUs: %d\n", num_devices);
+   if (myid == 0){
+      printf("MPI rank is: %d\n", myid);
+      printf("Device ID is: %d\n", myid % num_devices);
+   }
+   if (cudaStatus != cudaSuccess){
+      printf("CUDA Error: %s\n", cudaGetErrorString(cudaStatus));
+   }
+   else{
+      printf("CUDA Call is All Good! \n");
+   }
+   cudaError_t cudaStatus2 = cudaSetDevice(myid % num_devices);
+   if (cudaStatus2 != cudaSuccess){
+      printf("CUDA Error: %s\n", cudaGetErrorString(cudaStatus2));
+   }
+   else{
+      printf("CUDA Call is All Good! \n");
+   }
 
    time_index = hypre_InitializeTiming("Hypre init");
    hypre_BeginTiming(time_index);
@@ -2327,6 +2349,9 @@ main( hypre_int argc,
       hypre_printf("  Dirichlet 0 BCs are implicit in the spatial operator\n");
    }
 
+   int numberOfCycles = 10;
+   // BEGIN of iC loop for Spatial Operator
+   for (int iC = 0; iC < numberOfCycles; iC++){
    time_index = hypre_InitializeTiming("Spatial Operator");
    hypre_BeginTiming(time_index);
    if ( build_matrix_type == -1 )
@@ -2421,8 +2446,12 @@ main( hypre_int argc,
    }
    hypre_EndTiming(time_index);
    hypre_PrintTiming("Generate Matrix", hypre_MPI_COMM_WORLD);
+   if (myid ==0) {
+      hypre_printf("Iteration ---- %d\n", iC);
+   }
    hypre_FinalizeTiming(time_index);
    hypre_ClearTiming();
+   //} //END of iC loop for Spatial operator
 
    /* Check the ij interface - not necessary if one just wants to test solvers */
    if (test_ij && build_matrix_type > -1)
@@ -2811,6 +2840,8 @@ main( hypre_int argc,
    /*-----------------------------------------------------------
     * Set up the RHS and initial guess
     *-----------------------------------------------------------*/
+   // BEGIN of iC loop for RHS and Initial Guess
+   //for (int iC = 0; iC < numberOfCycles; iC++){
    time_index = hypre_InitializeTiming("RHS and Initial Guess");
    hypre_BeginTiming(time_index);
 
@@ -3322,8 +3353,12 @@ main( hypre_int argc,
 
    hypre_EndTiming(time_index);
    hypre_PrintTiming("IJ Vector Setup", hypre_MPI_COMM_WORLD);
+   if (myid ==0) {
+      hypre_printf("Iteration ---- %d\n", iC);
+   }
    hypre_FinalizeTiming(time_index);
    hypre_ClearTiming();
+   //} // END of iC loop for RHS and Initial Guess
 
    if (num_functions > 1)
    {
@@ -3565,6 +3600,12 @@ main( hypre_int argc,
 
    if (solver_id == 0 || solver_id == 90)
    {
+
+      // BEGIN of iC loop for BoomerAMG Setup
+      //for (int iC = 0; iC < numberOfCycles; iC++){
+      //  if (myid == 0) { 
+      //     hypre_printf("Iteration ---- %d\n", iC); 
+      //  }
       if (solver_id == 0)
       {
          if (myid == 0) { hypre_printf("Solver:  AMG\n"); }
@@ -3607,10 +3648,12 @@ main( hypre_int argc,
       HYPRE_BoomerAMGSetADropType(amg_solver, A_drop_type);
       /* BM Aug 25, 2006 */
       HYPRE_BoomerAMGSetCGCIts(amg_solver, cgcits);
+      printf("-----------------> interp type=  %d\n", interp_type);
       HYPRE_BoomerAMGSetInterpType(amg_solver, interp_type);
       HYPRE_BoomerAMGSetRestriction(amg_solver, restri_type); /* 0: P^T, 1: AIR, 2: AIR-2 */
       HYPRE_BoomerAMGSetPostInterpType(amg_solver, post_interp_type);
       HYPRE_BoomerAMGSetNumSamples(amg_solver, gsmg_samples);
+      printf("-----------------> coarsen type=  %d\n", coarsen_type);
       HYPRE_BoomerAMGSetCoarsenType(amg_solver, coarsen_type);
       HYPRE_BoomerAMGSetCoarsenCutFactor(amg_solver, coarsen_cut_factor);
       HYPRE_BoomerAMGSetCPoints(amg_solver, max_levels, num_cpt, cpt_index);
@@ -3660,6 +3703,7 @@ main( hypre_int argc,
       HYPRE_BoomerAMGSetChebyEigEst(amg_solver, cheby_eig_est);
       HYPRE_BoomerAMGSetChebyVariant(amg_solver, cheby_variant);
       HYPRE_BoomerAMGSetChebyScale(amg_solver, cheby_scale);
+      printf("-----------------> relax order=  %d\n", relax_order);
       HYPRE_BoomerAMGSetRelaxOrder(amg_solver, relax_order);
       HYPRE_BoomerAMGSetRelaxWt(amg_solver, relax_wt);
       HYPRE_BoomerAMGSetOuterWt(amg_solver, outer_wt);
@@ -3932,7 +3976,9 @@ main( hypre_int argc,
       {
          HYPRE_BoomerAMGDDDestroy(amgdd_solver);
       }
-   }
+    } 
+
+    //} //END of iC loop 
 
    /*-----------------------------------------------------------
     * Solve the system using GSMG
@@ -8082,6 +8128,7 @@ final:
       hypre_TFree(isolated_fpt_index, HYPRE_MEMORY_HOST);
    }
 
+   } //END of iC loop 
    /*
       hypre_FinalizeMemoryDebug();
    */
