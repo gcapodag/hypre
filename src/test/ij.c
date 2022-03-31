@@ -270,7 +270,7 @@ main( hypre_int argc,
    HYPRE_Real   relax_wt_level;
    HYPRE_Real   outer_wt;
    HYPRE_Real   outer_wt_level;
-   HYPRE_Real   tol = 1.e-8, pc_tol = 0.;
+   HYPRE_Real   tol = 1.e-11, pc_tol = 0.;
    HYPRE_Real   atol = 0.0;
    HYPRE_Real   max_row_sum = 1.;
    HYPRE_Int    converge_type = 0;
@@ -3953,6 +3953,7 @@ main( hypre_int argc,
 
       if (solver_id == 0)
       {
+         //HYPRE_ParVectorPrint(x, "solution.out");
          HYPRE_BoomerAMGDestroy(amg_solver);
       }
       else if (solver_id == 90)
